@@ -157,8 +157,7 @@
     <div class="container" id="mainContainer" >
         <h1>برنامج متابعة العقود والمستأجرين</h1>
         <h2>شركة بغداد العراق للنقل العام والاستثمارات العقارية</h2>
-                <button onclick="importFromExcel()">تحميل البيانات</button>
-
+        
         <button id="FormButton" onclick="toggleForm()">إدخال معلومات</button>
 
         <div id="tenantForm">
@@ -206,10 +205,12 @@
 
     <script>
 	
-let tenants = []; // قائمة المستأجرين سيتم جلبها من ملف Excel مباشرة
+        let tenants = JSON.parse(localStorage.getItem('tenants')) || [];
 
         document.addEventListener("DOMContentLoaded", function() {
-            loadExcelFromServer(); // تحميل البيانات تلقائيًا عند فتح الصفحة
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('lastPayment').value = today;
+            loadTenants(); // Load tenants on startup
         });
 
         function toggleForm() {
@@ -331,10 +332,12 @@ let tenants = []; // قائمة المستأجرين سيتم جلبها من م
             };
 backButton.remove(); 
             tenants.push(tenant);
-    loadTenants(); // إعادة تحميل قائمة المستأجرين
-    clearForm(); 
-    toggleForm();
-    showNotification("تم إضافة المستأجر بنجاح."); // Hide form after adding tenant
+            localStorage.setItem('tenants', JSON.stringify(tenants));
+            loadTenants(); // Reload tenants to update the select dropdown
+            clearForm(); // Clear input fields
+            hideLabels(); // Hide labels when clearing the form
+            showNotification("تم إضافة المستأجر بنجاح."); // Notification message
+            toggleForm(); // Hide form after adding tenant
 			ShowTenantSelector();
             playSound('buttonSound'); // Play sound on button click
             backButton.remove(); // إزالة زر "رجوع" عند إخفاء النموذج
@@ -342,17 +345,24 @@ backButton.remove();
         }
 
 
-        function loadTenants() {
-            const tenantList = document.getElementById('output');
-            tenantList.innerHTML = tenants.map(tenant => `
-                <p>المستأجر: ${tenant.name}</p>
-                <p>الإيجار: ${tenant.rent}</p>
-                <p>تاريخ آخر تسديد: ${tenant.lastPayment}</p>
-                <hr>
-            `).join('');
-            tenantList.style.display = 'block';
-        }
+function loadTenants() {
+    const tenantList = document.getElementById('tenantList');
+    tenantList.innerHTML = '<option value="">-- اختر مستأجر --</option>'; // Reset options
 
+    if (tenants.length === 0) {
+        document.getElementById('noTenantsMessage').style.display = 'block'; // Show message
+        document.getElementById('deleteButton').style.display = 'none'; // Hide delete button
+    } else {
+        document.getElementById('noTenantsMessage').style.display = 'none'; // Hide message
+        tenants.forEach((tenant, index) => {
+            const option = document.createElement('option');
+            option.value = index; // Use index as value for easy access
+            option.textContent = `${index + 1} - ${tenant.name}`; // Add sequence number with " - "
+            option.style.textAlign = 'right'; // Align text to the right
+            tenantList.appendChild(option);
+        });
+    }
+}
 
 function displayInfo() {
     const selectedIndex = document.getElementById('tenantList').value;
@@ -485,13 +495,14 @@ window.onload = function() {
 };
 
 
-// تحديث دالة `exportToExcel` لتكون الدالة الرئيسية للتخزين
 function exportToExcel() {
+    // Check if there are tenants to export
     if (tenants.length === 0) {
         showNotification("لا توجد بيانات للتصدير.");
         return;
     }
 
+    // Prepare data for the Excel sheet
     const data = tenants.map(tenant => ({
         "اسم المستأجر": tenant.name,
         "مبلغ الإيجار": tenant.rent,
@@ -499,12 +510,14 @@ function exportToExcel() {
         "أيام منذ آخر تسديد": calculateDaysSincePayment(tenant.lastPayment)
     }));
 
+    // Define workbook and worksheet
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "المستأجرين");
 
+    // Export as Excel file
     XLSX.writeFile(wb, "بيانات_المستأجرين.xlsx");
-    showNotification("تم تحديث ملف Excel بنجاح.");
+    showNotification("تم تصدير البيانات بنجاح.");
 }
 
         function calculateDaysSincePayment(lastPayment) {
@@ -516,16 +529,17 @@ function exportToExcel() {
 
 
         function deleteTenant() {
-                const selectedIndex = document.getElementById('tenantList').value;
+            const tenantList = document.getElementById('tenantList');
+            const selectedIndex = tenantList.value;
 
-    if (selectedIndex === "") return;
+            if (selectedIndex === "") return; // Do nothing if no tenant is selected
 
-    tenants.splice(selectedIndex, 1); // إزالة المستأجر المحدد
-    exportToExcel(); // تحديث ملف Excel مباشرة بعد الحذف
-    loadTenants();
-    document.getElementById('output').style.display = 'none';
-    document.getElementById('deleteButton').style.display = 'none';
-    showNotification("تم حذف المستأجر بنجاح.");
+            tenants.splice(selectedIndex, 1); // Remove the selected tenant
+            localStorage.setItem('tenants', JSON.stringify(tenants)); // Update local storage
+            loadTenants(); // Reload tenants
+            document.getElementById('output').style.display = 'none'; // Hide output
+            document.getElementById('deleteButton').style.display = 'none'; // Hide delete button
+            showNotification("تم حذف المستأجر بنجاح.");
             playSound('buttonSound'); // Play sound on button click
 					showButton();
 					showresButton();
@@ -698,33 +712,6 @@ function handleFile(event) {
 
     reader.readAsArrayBuffer(file);
 }
-
-async function loadExcelFromServer() {
-            try {
-                const response = await fetch('https://AzozAlbayati.github.io/rents/بيانات_المستأجرين.xlsx');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const arrayBuffer = await response.arrayBuffer();
-                const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const importedData = XLSX.utils.sheet_to_json(sheet);
-
-                tenants = importedData.map(item => ({
-                    name: item["اسم المستأجر"] || "غير معروف",
-                    rent: parseInt(item["مبلغ الإيجار"] || 0),
-                    lastPayment: item["تاريخ آخر تسديد"] || new Date().toISOString().split('T')[0]
-                }));
-
-                loadTenants();
-                showNotification("تم تحميل البيانات من الخادم بنجاح.");
-            } catch (error) {
-                console.error("Error loading Excel file:", error);
-                showNotification("حدث خطأ في تحميل البيانات. تأكد من أن الرابط صحيح.");
-            }
-        }
 
 
     </script>
