@@ -342,24 +342,17 @@ backButton.remove();
         }
 
 
-function loadTenants() {
-    const tenantList = document.getElementById('tenantList');
-    tenantList.innerHTML = '<option value="">-- اختر مستأجر --</option>'; // Reset options
+        function loadTenants() {
+            const tenantList = document.getElementById('output');
+            tenantList.innerHTML = tenants.map(tenant => `
+                <p>المستأجر: ${tenant.name}</p>
+                <p>الإيجار: ${tenant.rent}</p>
+                <p>تاريخ آخر تسديد: ${tenant.lastPayment}</p>
+                <hr>
+            `).join('');
+            tenantList.style.display = 'block';
+        }
 
-    if (tenants.length === 0) {
-        document.getElementById('noTenantsMessage').style.display = 'block'; // Show message
-        document.getElementById('deleteButton').style.display = 'none'; // Hide delete button
-    } else {
-        document.getElementById('noTenantsMessage').style.display = 'none'; // Hide message
-        tenants.forEach((tenant, index) => {
-            const option = document.createElement('option');
-            option.value = index; // Use index as value for easy access
-            option.textContent = `${index + 1} - ${tenant.name}`; // Add sequence number with " - "
-            option.style.textAlign = 'right'; // Align text to the right
-            tenantList.appendChild(option);
-        });
-    }
-}
 
 function displayInfo() {
     const selectedIndex = document.getElementById('tenantList').value;
@@ -732,10 +725,6 @@ async function loadExcelFromServer() {
                 showNotification("حدث خطأ في تحميل البيانات. تأكد من أن الرابط صحيح.");
             }
         }
-
-document.addEventListener("DOMContentLoaded", function() {
-    loadExcelFromServer();
-});
 
 
     </script>
