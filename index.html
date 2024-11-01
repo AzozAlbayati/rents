@@ -208,12 +208,9 @@
 	
 let tenants = []; // قائمة المستأجرين سيتم جلبها من ملف Excel مباشرة
 
-document.addEventListener("DOMContentLoaded", function() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('lastPayment').value = today;
-    importFromExcel();
-loadTenants();	// استيراد البيانات عند تحميل الصفحة
-});
+        document.addEventListener("DOMContentLoaded", function() {
+            loadExcelFromServer(); // تحميل البيانات تلقائيًا عند فتح الصفحة
+        });
 
         function toggleForm() {
             const form = document.getElementById('tenantForm');
@@ -710,22 +707,31 @@ function handleFile(event) {
 }
 
 async function loadExcelFromServer() {
-    const response = await fetch('https://AzozAlbayati.github.io/rents/بيانات_المستأجرين.xlsx');
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const importedData = XLSX.utils.sheet_to_json(sheet);
+            try {
+                const response = await fetch('https://AzozAlbayati.github.io/rents/بيانات_المستأجرين.xlsx');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-    tenants = importedData.map(item => ({
-        name: item["اسم المستأجر"] || "غير معروف",
-        rent: parseInt(item["مبلغ الإيجار"] || 0),
-        lastPayment: item["تاريخ آخر تسديد"] || new Date().toISOString().split('T')[0]
-    }));
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const importedData = XLSX.utils.sheet_to_json(sheet);
 
-    loadTenants();
-    showNotification("تم تحميل البيانات من الخادم بنجاح.");
-}
+                tenants = importedData.map(item => ({
+                    name: item["اسم المستأجر"] || "غير معروف",
+                    rent: parseInt(item["مبلغ الإيجار"] || 0),
+                    lastPayment: item["تاريخ آخر تسديد"] || new Date().toISOString().split('T')[0]
+                }));
+
+                loadTenants();
+                showNotification("تم تحميل البيانات من الخادم بنجاح.");
+            } catch (error) {
+                console.error("Error loading Excel file:", error);
+                showNotification("حدث خطأ في تحميل البيانات. تأكد من أن الرابط صحيح.");
+            }
+        }
 
 document.addEventListener("DOMContentLoaded", function() {
     loadExcelFromServer();
